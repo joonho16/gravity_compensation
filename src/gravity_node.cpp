@@ -118,53 +118,53 @@ public:
 
   ~GravityNode()
   {
-    RCLCPP_WARN(this->get_logger(), "🛑 Simple Damping Stop...");
+    // RCLCPP_WARN(this->get_logger(), "🛑 Simple Damping Stop...");
 
-    double damping_gain = 0.3; 
-    int steps = 200; 
+    // double damping_gain = 0.3; 
+    // int steps = 200; 
     
-    for (int k = 0; k < steps; k++) {
-        int comm_result = groupSyncRead_->txRxPacket();
-        if (comm_result != COMM_SUCCESS) continue;
+    // for (int k = 0; k < steps; k++) {
+    //     int comm_result = groupSyncRead_->txRxPacket();
+    //     if (comm_result != COMM_SUCCESS) continue;
 
-        groupSyncWrite_->clearParam();
+    //     groupSyncWrite_->clearParam();
         
-        for (size_t i = 0; i < MY_DXL_ID.size(); i++) {
-            uint8_t id = MY_DXL_ID[i];
+    //     for (size_t i = 0; i < MY_DXL_ID.size(); i++) {
+    //         uint8_t id = MY_DXL_ID[i];
             
-            if (groupSyncRead_->isAvailable(id, 128, 4)) {
-                int32_t vel_raw = groupSyncRead_->getData(id, 128, 4);
-                double vel_rpm = vel_raw * 0.229;
-                double velocity = (vel_rpm * 2.0 * M_PI) / 60.0;
+    //         if (groupSyncRead_->isAvailable(id, 128, 4)) {
+    //             int32_t vel_raw = groupSyncRead_->getData(id, 128, 4);
+    //             double vel_rpm = vel_raw * 0.229;
+    //             double velocity = (vel_rpm * 2.0 * M_PI) / 60.0;
                 
-                velocity *= AXIS_DIR[i];
-                double brake_torque = -damping_gain * velocity;
+    //             velocity *= AXIS_DIR[i];
+    //             double brake_torque = -damping_gain * velocity;
 
-                if (std::abs(velocity) > 0.1) {
-                    brake_torque = -damping_gain * velocity;
-                }
+    //             if (std::abs(velocity) > 0.1) {
+    //                 brake_torque = -damping_gain * velocity;
+    //             }
 
-                if (brake_torque > 0.5) brake_torque = 0.5;
-                if (brake_torque < -0.5) brake_torque = -0.5;
+    //             if (brake_torque > 0.5) brake_torque = 0.5;
+    //             if (brake_torque < -0.5) brake_torque = -0.5;
 
-                double current_ma = (brake_torque / TORQUE_CONSTANT) * 1000.0;
-                int16_t goal_current = (int16_t)(current_ma / CURRENT_UNIT_MA);
-                goal_current *= AXIS_DIR[i];
+    //             double current_ma = (brake_torque / TORQUE_CONSTANT) * 1000.0;
+    //             int16_t goal_current = (int16_t)(current_ma / CURRENT_UNIT_MA);
+    //             goal_current *= AXIS_DIR[i];
 
-                uint8_t param[2];
-                param[0] = DXL_LOBYTE(goal_current);
-                param[1] = DXL_HIBYTE(goal_current);
-                groupSyncWrite_->addParam(id, param);
-            }
-        }
-        groupSyncWrite_->txPacket();
+    //             uint8_t param[2];
+    //             param[0] = DXL_LOBYTE(goal_current);
+    //             param[1] = DXL_HIBYTE(goal_current);
+    //             groupSyncWrite_->addParam(id, param);
+    //         }
+    //     }
+    //     groupSyncWrite_->txPacket();
         
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    }
+    //     std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    // }
 
-    for (auto id : MY_DXL_ID) {
-        packetHandler_->write1ByteTxRx(portHandler_, id, ADDR_TORQUE_ENABLE, 0);
-    }
+    // for (auto id : MY_DXL_ID) {
+    //     packetHandler_->write1ByteTxRx(portHandler_, id, ADDR_TORQUE_ENABLE, 0);
+    // }
     portHandler_->closePort();
     RCLCPP_INFO(this->get_logger(), "Finished.");
   }
@@ -366,10 +366,10 @@ private:
   }
 
   // Kc: 정지 마찰 (단위: Nm), Kv: 점성 마찰 (단위: Nm / (rad/s))
-  std::vector<double> friction_k_c_ = {0.02, 0.02, 0.02, 0.015, 0.015, 0.015}; 
-  std::vector<double> friction_k_v_ = {0.01, 0.01, 0.01, 0.01, 0.01, 0.01};
+  std::vector<double> friction_k_c_ = {0.0, 0.0, 0.0, 0.0, 0.0, 0.005}; 
+  std::vector<double> friction_k_v_ = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
-  std::vector<double> gravity_gains_ = {1.0, 0.75, 0.75, 0.5, 0.5, 0.5};
+  std::vector<double> gravity_gains_ = {1.0, 0.8, 0.75, 0.5, 0.5, 0.5};
 
   rclcpp::Node::OnSetParametersCallbackHandle::SharedPtr param_callback_handle_;
 
