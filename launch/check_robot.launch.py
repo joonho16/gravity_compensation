@@ -6,10 +6,13 @@ from launch_ros.actions import Node
 def generate_launch_description():
     pkg_name = 'gravity_compensation'
     urdf_file = 'my_robot.urdf'
+    rviz_config_file = 'easyController_view.rviz'
 
     # 1. URDF 파일 경로 잡기
     pkg_share = get_package_share_directory(pkg_name)
     urdf_path = os.path.join(pkg_share, 'urdf', urdf_file)
+    # RViz 설정 파일 경로 추가
+    rviz_config_path = os.path.join(pkg_share, 'rviz', rviz_config_file)
 
     # 2. URDF 내용 읽기
     with open(urdf_path, 'r') as infp:
@@ -39,5 +42,6 @@ def generate_launch_description():
             executable='rviz2',
             name='rviz2',
             output='screen',
+            arguments=['-d', rviz_config_path],
         ),
     ])

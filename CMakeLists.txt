@@ -37,7 +37,7 @@ ament_target_dependencies(gravity_node
 )
 
 # 4. 설치 설정
-install(DIRECTORY urdf meshes
+install(DIRECTORY urdf meshes rviz
   DESTINATION share/${PROJECT_NAME}
 )
 
