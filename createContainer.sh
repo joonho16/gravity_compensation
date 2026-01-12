@@ -9,7 +9,8 @@ docker run -it --rm \
     --privileged \
     --env="DISPLAY" \
     --env="QT_X11_NO_MITSHM=1" \
-    --env="ROS_DOMAIN_ID=50" \
+    --env="ROS_DOMAIN_ID=51" \
+    --env="RMW_IMPLEMENTATION=rmw_cyclonedds_cpp" \
     --volume="/tmp/.X11-unix:/tmp/.X11-unix:rw" \
     --volume="$(pwd):/root/colcon_ws" \
     --network host \

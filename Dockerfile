@@ -11,6 +11,7 @@ RUN apt-get update && apt-get install -y \
     python3-rosdep \
     ros-$ROS_DISTRO-dynamixel-sdk \
     ros-$ROS_DISTRO-pinocchio\
+    ros-$ROS_DISTRO-rmw-cyclonedds-cpp \
     && rm -rf /var/lib/apt/lists/*
 
 # 3. 작업 디렉토리 설정 (컨테이너 접속 시 바로 여기로 들어감)
