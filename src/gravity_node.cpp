@@ -21,28 +21,29 @@ using namespace std::chrono_literals;
 // ==========================================
 // [사용자 하드웨어 설정]
 // ==========================================
-#define DEVICENAME      "/dev/ttyUSB0"
+#define DEVICENAME      "/dev/ttyUSB2"
 #define BAUDRATE        4500000
 #define URDF_FILENAME   "my_robot.urdf" 
 
 // 모터 ID (1~6번이라고 가정)
 const std::vector<uint8_t> MY_DXL_ID = {10, 11, 12, 13, 14, 15}; 
+const uint8_t GRIPPER_DXL_ID = 16; // 그리퍼 모터 ID
 
 // 방향 보정 (모터 회전 방향과 URDF 회전 방향이 반대면 -1)
-const std::vector<int>     AXIS_DIR  = {1, 1, 1, 1, 1, 1};        
-const std::vector<double>  JOINT_OFFSET = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+const std::vector<int>     AXIS_DIR  = {1, 1, -1, 1, -1, 1};        
+const std::vector<double>  JOINT_OFFSET = {0.0, -1.31, 2.88, 0.0, 0.0, 0.0};
 
 const double TORQUE_CONSTANT = 1.8;   // XM430-W350 기준 (Nm/A)
 const double CURRENT_UNIT_MA = 2.69;  // 1 unit = 2.69mA
 
 // [중요] URDF 파일 내부의 Joint 이름과 순서 매칭
 const std::vector<std::string> JOINT_NAMES = {
-    "Revolute 2",  // ID 1
-    "Revolute 4",  // ID 2
-    "Revolute 6",  // ID 3
-    "Revolute 8",  // ID 4
-    "Revolute 10", // ID 5
-    "Revolute 12"  // ID 6
+    "joint1",  // ID 1
+    "joint2",  // ID 2
+    "joint3",  // ID 3
+    "joint4",  // ID 4
+    "joint5", // ID 5
+    "joint6"  // ID 6
 };
 
 // 다이나믹셀 주소 (XM 시리즈 Protocol 2.0)
@@ -52,8 +53,8 @@ const std::vector<std::string> JOINT_NAMES = {
 #define LEN_GOAL_CURRENT    2
 #define ADDR_READ_START     128 
 #define LEN_READ_TOTAL      8
-#define ADDR_PRESENT_POS 132
-#define LEN_PRESENT_POS  4
+#define ADDR_PRESENT_POS    132
+#define LEN_PRESENT_POS     4
 
 class GravityNode : public rclcpp::Node
 {
@@ -107,7 +108,7 @@ public:
     init_dynamixel();
 
     // 3. Publisher 생성
-    joint_pub_ = this->create_publisher<sensor_msgs::msg::JointState>("joint_states", 10);
+    joint_pub_ = this->create_publisher<sensor_msgs::msg::JointState>("ec_robot_2/joint_states", 10);
 
     // 4. 제어 루프 타이머 (1000Hz = 1ms)
     timer_ = this->create_wall_timer(
@@ -137,7 +138,7 @@ public:
                 double vel_rpm = vel_raw * 0.229;
                 double velocity = (vel_rpm * 2.0 * M_PI) / 60.0;
                 
-                velocity *= AXIS_DIR[i];
+                // velocity *= AXIS_DIR[i];
                 double brake_torque = -damping_gain * velocity;
 
                 if (std::abs(velocity) > 0.1) {
@@ -149,7 +150,7 @@ public:
 
                 double current_ma = (brake_torque / TORQUE_CONSTANT) * 1000.0;
                 int16_t goal_current = (int16_t)(current_ma / CURRENT_UNIT_MA);
-                goal_current *= AXIS_DIR[i];
+                // goal_current *= AXIS_DIR[i];
 
                 uint8_t param[2];
                 param[0] = DXL_LOBYTE(goal_current);
@@ -191,6 +192,7 @@ private:
         packetHandler_->write1ByteTxRx(portHandler_, id, ADDR_TORQUE_ENABLE, 1);
         groupSyncRead_->addParam(id);
     }
+    groupSyncRead_->addParam(GRIPPER_DXL_ID);
   }
 
   rcl_interfaces::msg::SetParametersResult parametersCallback(const std::vector<rclcpp::Parameter> &parameters)
@@ -243,14 +245,26 @@ private:
             int32_t vel_raw = groupSyncRead_->getData(id, 128, 4);
             double vel_rpm = vel_raw * 0.229; // XM 시리즈 RPM 단위
             double vel_rad = vel_rpm * (2.0 * M_PI / 60.0);
-            v[i] = vel_rad * AXIS_DIR[i];
+            // v[i] = vel_rad * AXIS_DIR[i];
+            v[i] = vel_rad;
 
             // 2. 위치 읽기 (뒤 4바이트: 132~135)
             int32_t pos_raw = groupSyncRead_->getData(id, 132, 4);
             double pos_rad = (pos_raw - 2048.0) * (2.0 * M_PI / 4096.0);
-            q_[i] = (pos_rad * AXIS_DIR[i]) + JOINT_OFFSET[i];
+            // q_[i] = (pos_rad * AXIS_DIR[i]) + JOINT_OFFSET[i];
+            q_[i] = pos_rad;
         }
     }
+    if(groupSyncRead_->isAvailable(GRIPPER_DXL_ID, ADDR_READ_START, LEN_READ_TOTAL)) {
+        int32_t pos_raw = groupSyncRead_->getData(GRIPPER_DXL_ID, 132, 4);
+        double pos_rad = (pos_raw - 2048.0) * (2.0 * M_PI / 4096.0);
+        // pos_rad -> 0.0~0.1 사이로 매핑
+        if (pos_rad < 0.0) pos_rad = 0.0;
+        else if (pos_rad > 0.5236) pos_rad = 0.5236; 
+        pos_rad = (pos_rad) * (0.1 - 0.0) / (0.5236 - 0.0) + 0.0;
+        gripper_position_ = pos_rad;
+    }
+
 
     // [B-1] 중력 토크 계산
     Eigen::VectorXd tau_gravity = pinocchio::computeGeneralizedGravity(model_, *data_, q_);
@@ -328,7 +342,7 @@ private:
         double current_ma = (torque / TORQUE_CONSTANT) * 1000.0;
         int16_t goal_current = (int16_t)(current_ma / CURRENT_UNIT_MA);
         
-        goal_current *= AXIS_DIR[i];
+        // goal_current *= AXIS_DIR[i];
 
         last_goal_currents_[i] = goal_current;
 
@@ -358,18 +372,24 @@ private:
         msg.header.stamp = this->now();
         for(size_t i=0; i<MY_DXL_ID.size(); i++) {
             msg.name.push_back(JOINT_NAMES[i]); // 매칭된 이름 사용
+            q_[i] = (q_[i] * AXIS_DIR[i]) - JOINT_OFFSET[i];
             msg.position.push_back(q_[i]);
             msg.effort.push_back(tau[i]);
         }
+
+        msg.name.push_back("gripper");
+        msg.position.push_back(-1 * gripper_position_);
+        msg.effort.push_back(0.0);
+
         joint_pub_->publish(msg);
     }
   }
 
   // Kc: 정지 마찰 (단위: Nm), Kv: 점성 마찰 (단위: Nm / (rad/s))
-  std::vector<double> friction_k_c_ = {0.02, 0.02, 0.02, 0.015, 0.015, 0.015}; 
-  std::vector<double> friction_k_v_ = {0.01, 0.01, 0.01, 0.01, 0.01, 0.01};
+  std::vector<double> friction_k_c_ = {0.0, 0.02, 0.02, 0.01, 0.01, 0.0}; 
+  std::vector<double> friction_k_v_ = {0.001, 0.01, 0.01, 0.0, 0.0, 0.0};
 
-  std::vector<double> gravity_gains_ = {1.0, 0.75, 0.75, 0.5, 0.5, 0.5};
+  std::vector<double> gravity_gains_ = {1.0, 0.75, 0.75, 0.5, 0.3, 0.3};
 
   rclcpp::Node::OnSetParametersCallbackHandle::SharedPtr param_callback_handle_;
 
@@ -381,6 +401,7 @@ private:
   pinocchio::Model model_;
   std::unique_ptr<pinocchio::Data> data_;
   Eigen::VectorXd q_;
+  double gripper_position_ = 0.0;
 
   rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr joint_pub_;
   rclcpp::TimerBase::SharedPtr timer_;
