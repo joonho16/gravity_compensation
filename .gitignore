@@ -1,0 +1,11 @@
+# 빌드 관련 폴더 제외
+build/
+install/
+log/
+
+# Python 컴파일 파일
+__pycache__/
+*.pyc
+
+# 사용자 설정 및 기타
+.vscode/
