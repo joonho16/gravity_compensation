@@ -26,6 +26,9 @@ def generate_launch_description():
             name='robot_state_publisher',
             output='screen',
             parameters=[{'robot_description': robot_desc}],
+            remappings=[
+                ('/joint_states', '/ec_robot_5/joint_states')
+            ]
         ),
 
         # [우리 노드] Gravity Node (Monitor Mode여야 함!)
